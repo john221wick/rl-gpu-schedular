@@ -36,6 +36,16 @@ app = FastAPI(
 ENV = GPUSchedulerEnv()
 
 
+@app.get("/")
+def root() -> dict[str, Any]:
+    return {
+        "name": "gpu-scheduler-ml",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
