@@ -1,0 +1,23 @@
+[project]
+name = "rl-gpu-schedular"
+version = "0.1.0"
+description = "GPU job scheduler RL environment for mixed ML workloads"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "fastapi>=0.135.2",
+    "openenv-core>=0.2.0",
+    "openai>=2.30.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.2.2",
+    "uvicorn>=0.42.0",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["gpu_scheduler*", "server*"]

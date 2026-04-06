@@ -1,0 +1,22 @@
+name: gpu-scheduler-ml
+description: >
+  GPU cluster scheduler for mixed ML workloads (training + inference).
+  8 action types including quantize, wait, checkpoint-preempt.
+  Models fragmentation, KV cache growth, SLA, topology, model warmth.
+version: "1.0.0"
+tasks:
+  - id: easy_001
+    difficulty: easy
+    description: "2 GPUs, training only, learn bin packing"
+  - id: medium_001
+    difficulty: medium
+    description: "4 GPUs, mixed training+inference, SLA, quantization"
+  - id: hard_001
+    difficulty: hard
+    description: "Full: bursty inference, topology, multi-GPU, all edge cases"
+observation_space:
+  type: object
+  fields: [step, max_steps, gpus, training_queue, inference_queue, pending, metrics]
+action_space:
+  type: object
+  fields: [action_type, item_id, target_gpu, preempt_job_id, model_to_unload, quantize_target]

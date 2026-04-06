@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+.env
+.mypy_cache
+.pytest_cache
+.ruff_cache
+htmlcov
+dist
+build
+baseline_results.json
+tests
