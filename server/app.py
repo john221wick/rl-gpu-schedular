@@ -5,6 +5,7 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 
 from gpu_scheduler.baseline import run_baseline
 from gpu_scheduler.compat import BaseModel
@@ -49,6 +50,11 @@ def root() -> dict[str, Any]:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots() -> str:
+    return "User-agent: *\nAllow: /\n"
 
 
 @app.get("/tasks")

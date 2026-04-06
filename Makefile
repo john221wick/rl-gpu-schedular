@@ -1,7 +1,7 @@
 UV := uv
 PYTHON := python
 
-.PHONY: init sync lock test smoke api inference baseline-medium baseline-hard docker-build clean clean-venv
+.PHONY: init sync lock test smoke api inference hf-login hf-whoami baseline-medium baseline-hard docker-build clean clean-venv
 
 init:
 	$(UV) venv
@@ -24,6 +24,12 @@ api:
 
 inference:
 	$(UV) run $(PYTHON) inference.py
+
+hf-login:
+	$(UV) run hf auth login
+
+hf-whoami:
+	$(UV) run hf auth whoami
 
 baseline-medium:
 	$(UV) run $(PYTHON) -c "from gpu_scheduler.baseline import run_baseline; import json; print(json.dumps(run_baseline('smart', 'medium_001'), indent=2))"

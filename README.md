@@ -126,6 +126,22 @@ make test
 make api
 ```
 
+For local Hugging Face CLI testing, do not run `uv add huggingface_cli`.
+That package name does not exist.
+
+Use the project environment directly:
+
+```bash
+uv run hf auth login
+uv run hf auth whoami
+```
+
+If you want the old command name shown in some hackathon screenshots, this repo also exposes a compatibility alias:
+
+```bash
+uv run huggingface-cli login
+```
+
 Run the API locally:
 
 ```bash
@@ -151,9 +167,9 @@ curl http://127.0.0.1:7860/valid-actions
 
 Required environment variables for submission:
 
-- `HF_TOKEN`
-- `MODEL_NAME`
 - `API_BASE_URL`
+- `MODEL_NAME`
+- `HF_TOKEN`
 
 Defaults are only set in `inference.py` for:
 
@@ -165,7 +181,7 @@ Defaults are only set in `inference.py` for:
 Optional:
 
 - `LOCAL_IMAGE_NAME`
-  This project does not use it because `inference.py` runs the local environment directly.
+  It is declared in `inference.py` with the required name for hackathon compatibility.
 
 Example:
 

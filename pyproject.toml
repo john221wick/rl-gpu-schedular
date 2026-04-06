@@ -10,10 +10,12 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv>=1.2.2",
     "uvicorn>=0.42.0",
+    "huggingface-hub>=1.9.0",
 ]
 
 [project.scripts]
 server = "server.app:main"
+huggingface-cli = "huggingface_hub.cli.hf:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

@@ -19,10 +19,12 @@ from gpu_scheduler.tasks import list_tasks
 
 load_dotenv()
 
+# Required by the hackathon submission format.
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")  # Optional when using from_docker_image().
+API_KEY = HF_TOKEN
 BENCHMARK = "gpu-scheduler-ml"
 TEMPERATURE = 0.0
 MAX_TOKENS = 220
@@ -70,9 +72,9 @@ def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> No
 
 
 def build_client() -> OpenAI | None:
-    if not HF_TOKEN:
+    if not API_KEY:
         return None
-    return OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    return OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
 
 def action_to_str(action: Action | None) -> str:
