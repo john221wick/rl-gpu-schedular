@@ -37,7 +37,7 @@ app = FastAPI(
 ENV = GPUSchedulerEnv()
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root() -> dict[str, Any]:
     return {
         "name": "gpu-scheduler-ml",
@@ -47,12 +47,12 @@ def root() -> dict[str, Any]:
     }
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/robots.txt", response_class=PlainTextResponse)
+@app.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=PlainTextResponse)
 def robots() -> str:
     return "User-agent: *\nAllow: /\n"
 
