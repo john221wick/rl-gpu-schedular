@@ -19,17 +19,30 @@ from gpu_scheduler.tasks import list_tasks
 
 load_dotenv()
 
+
+def _require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
 # Required by the hackathon submission format.
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+API_BASE_URL = _require_env("API_BASE_URL")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = _require_env("API_KEY")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")  # Optional when using from_docker_image().
-API_KEY = HF_TOKEN
 BENCHMARK = "gpu-scheduler-ml"
 TEMPERATURE = 0.0
 MAX_TOKENS = 220
+LLM_REQUEST_TIMEOUT_SECONDS = max(0.1, float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "3.0")))
+MAX_LLM_RETRIES = max(1, int(os.getenv("MAX_LLM_RETRIES", "1")))
+MAX_LLM_CALLS = max(1, int(os.getenv("MAX_LLM_CALLS", "3")))
+LLM_TOTAL_BUDGET_SECONDS = max(0.0, float(os.getenv("LLM_TOTAL_BUDGET_SECONDS", "8.0")))
+PROXY_PING_MAX_TOKENS = max(1, int(os.getenv("PROXY_PING_MAX_TOKENS", "8")))
 LLM_DISABLED = False
-MAX_LLM_RETRIES = 3
+LLM_CALL_COUNT = 0
+LLM_TOTAL_LATENCY_SECONDS = 0.0
+PROXY_PRIMED = False
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
@@ -72,9 +85,36 @@ def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> No
 
 
 def build_client() -> OpenAI | None:
-    if not API_KEY:
-        return None
-    return OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    return OpenAI(
+        base_url=API_BASE_URL,
+        api_key=API_KEY,
+        timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+        max_retries=0,
+    )
+
+
+def prime_proxy(client: OpenAI | None, model_name: str) -> None:
+    global LLM_DISABLED, LLM_TOTAL_LATENCY_SECONDS, PROXY_PRIMED
+
+    if client is None or LLM_DISABLED or PROXY_PRIMED:
+        return
+
+    started = time.monotonic()
+    try:
+        client.chat.completions.create(
+            model=model_name,
+            temperature=0.0,
+            max_tokens=PROXY_PING_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": "Return strict JSON only."},
+                {"role": "user", "content": '{"ping":"proxy","reply":"ok"}'},
+            ],
+        )
+        PROXY_PRIMED = True
+    except Exception as exc:  # pragma: no cover - network/runtime fallback
+        _disable_llm(f"Proxy warm-up failed, using heuristic policy: {exc}")
+    finally:
+        LLM_TOTAL_LATENCY_SECONDS += time.monotonic() - started
 
 
 def action_to_str(action: Action | None) -> str:
@@ -100,7 +140,7 @@ def choose_action(
     task: dict[str, Any],
     observation: dict[str, Any],
 ) -> Action | None:
-    global LLM_DISABLED
+    global LLM_CALL_COUNT, LLM_DISABLED, LLM_TOTAL_LATENCY_SECONDS
 
     valid_actions = env.get_valid_actions()
     if not valid_actions:
@@ -108,6 +148,13 @@ def choose_action(
 
     heuristic_action = smart_heuristic_policy(env)
     if client is None or LLM_DISABLED:
+        return heuristic_action or Action.model_validate(valid_actions[0])
+
+    if (
+        LLM_CALL_COUNT >= MAX_LLM_CALLS
+        or LLM_TOTAL_LATENCY_SECONDS >= LLM_TOTAL_BUDGET_SECONDS
+    ):
+        _disable_llm("LLM budget exhausted, using heuristic policy for remaining steps.")
         return heuristic_action or Action.model_validate(valid_actions[0])
 
     prompt = {
@@ -126,7 +173,9 @@ def choose_action(
     }
 
     for attempt in range(1, MAX_LLM_RETRIES + 1):
+        started = time.monotonic()
         try:
+            LLM_CALL_COUNT += 1
             response = client.chat.completions.create(
                 model=model_name,
                 temperature=TEMPERATURE,
@@ -141,22 +190,16 @@ def choose_action(
             action_index = parsed.get("action_index")
             if isinstance(action_index, int) and 0 <= action_index < len(valid_actions):
                 return Action.model_validate(valid_actions[action_index])
+            _disable_llm("Model returned an invalid action, using heuristic policy for remaining steps.")
             break
         except Exception as exc:  # pragma: no cover - network/runtime fallback
             status_code = getattr(exc, "status_code", None)
-            if status_code in {401, 402, 403}:
-                LLM_DISABLED = True
-                print(f"Model action selection failed, disabling LLM path: {exc}", file=sys.stderr)
-                break
             if status_code in {429, 500, 502, 503, 504} and attempt < MAX_LLM_RETRIES:
-                time.sleep(attempt)
                 continue
-            if status_code in {429, 500, 502, 503, 504}:
-                print(f"Model action selection failed for this step, using fallback: {exc}", file=sys.stderr)
-                break
-            LLM_DISABLED = True
-            print(f"Model action selection failed, disabling LLM path: {exc}", file=sys.stderr)
+            _disable_llm(f"Model action selection failed, disabling LLM path: {exc}")
             break
+        finally:
+            LLM_TOTAL_LATENCY_SECONDS += time.monotonic() - started
 
     return heuristic_action or Action.model_validate(valid_actions[0])
 
@@ -284,8 +327,16 @@ def _sanitize(value: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip() or "null"
 
 
+def _disable_llm(message: str) -> None:
+    global LLM_DISABLED
+    if not LLM_DISABLED:
+        print(message, file=sys.stderr)
+    LLM_DISABLED = True
+
+
 def main() -> int:
     client = build_client()
+    prime_proxy(client, MODEL_NAME)
     task_ids = [task["id"] for task in list_tasks()]
     all_ok = True
 

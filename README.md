@@ -159,7 +159,9 @@ curl http://127.0.0.1:7860/valid-actions
 
 `inference.py` is the root-level submission script.
 
-- uses the OpenAI client
+- uses the injected `API_BASE_URL` and `API_KEY`
+- requires `API_BASE_URL` and `API_KEY` in the environment
+- makes a small bounded proxy warm-up call, then limits model usage to a few fast decisions
 - runs all three tasks
 - prints `[START]`, `[STEP]`, and `[END]`
 - falls back to the built-in heuristic if the LLM call fails
@@ -167,17 +169,20 @@ curl http://127.0.0.1:7860/valid-actions
 Required:
 
 - `API_BASE_URL`
-- `MODEL_NAME`
-- `HF_TOKEN`
+- `API_KEY`
 
-Default is set only for:
+Default is set for:
 
-- `API_BASE_URL`
 - `MODEL_NAME`
 
 Optional:
 
 - `LOCAL_IMAGE_NAME`
+- `LLM_REQUEST_TIMEOUT_SECONDS`
+- `MAX_LLM_RETRIES`
+- `MAX_LLM_CALLS`
+- `LLM_TOTAL_BUDGET_SECONDS`
+- `PROXY_PING_MAX_TOKENS`
 
 Example:
 
@@ -200,7 +205,7 @@ This repo is configured as a Docker Space on port `7860`.
 
 Set these Space variables or secrets:
 
-- `HF_TOKEN`
+- `API_KEY`
 - `MODEL_NAME`
 - `API_BASE_URL`
 
